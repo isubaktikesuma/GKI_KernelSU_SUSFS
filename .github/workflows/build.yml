@@ -420,6 +420,13 @@ jobs:
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
 
+      - name: Configure KPM Support
+        run: |
+          cd "$KERNEL_ROOT"
+          # Kernel Patch Module Configuration
+          echo "# Kernel Patch Module Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
+
       - name: Configure Mountify Support
         run: |
           cd "$KERNEL_ROOT"
