@@ -301,23 +301,27 @@ jobs:
              KSU_DIR="$KERNEL_ROOT/KernelSU"
           fi
 
-          if [ -n "$KSU_DIR" ] && [ -d "$KSU_DIR" ]; then
-             echo "Applying SUSFS enable patch to $KSU_DIR"
-             cd "$KSU_DIR"
-             cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-             patch -p1 < 10_enable_susfs_for_ksu.patch || true
+          # Only Apply 10_enable_susfs_for_ksu if NOT SukiSU
+          # SukiSU with susfs-main likely handles this or is incompatible with the standard patch
+          if [ "${{ inputs.ksu_variant }}" != "SukiSU" ]; then
+            if [ -n "$KSU_DIR" ] && [ -d "$KSU_DIR" ]; then
+               echo "Applying SUSFS enable patch to $KSU_DIR"
+               cd "$KSU_DIR"
+               cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+               patch -p1 < 10_enable_susfs_for_ksu.patch || true
+            else
+               echo "Error: KernelSU directory not found for variant ${{ inputs.ksu_variant }}"
+            fi
           else
-             echo "Error: KernelSU directory not found for variant ${{ inputs.ksu_variant }}"
-             # We assume SukiSU might have built-in support if not found, or it's a fatal error.
-             # Continuing to avoid hard breaking, but this log is critical.
+             echo "Skipping 10_enable_susfs_for_ksu.patch for SukiSU (handled by setup script or incompatible)"
           fi
           
           cd "$KERNEL_ROOT"
           
           case "${{ inputs.ksu_variant }}" in
-            WKSU|SukiSU)
+            WKSU)
               # Apply necessary fix patches for SUSFS compatibility
-              # These fixes are shared between WKSU and SukiSU as they address similar integration issues
+              # These fixes are SPECIFIC to WKSU and cause failures on SukiSU
               cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch" ./
               patch -p1 < fix_core_hook.c.patch
               
@@ -326,6 +330,10 @@ jobs:
               
               cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch" ./
               patch -p1 < fix_kernel_compat.c.patch
+              ;;
+            SukiSU)
+              # SukiSU specific fixes (if any needed in future, add here)
+              echo "No extra WKSU fix patches needed for SukiSU"
               ;;
             KSU)
               # Your KSU-specific code goes here
@@ -637,7 +645,7 @@ jobs:
         run: |
           cd "$KERNEL_ROOT"
           #Wild to Kernel Version
-          sed -i '$s|echo "\$res"|echo "\$res-DexSubakti"|' ./common/scripts/setlocalversion
+          sed -i '$s|echo "\$res"|echo "\$res-Wild"|' ./common/scripts/setlocalversion
           #Set Kernel Timestamp
           UTS_VERSION="#1 SMP PREEMPT $(date -u +%a\ %b\ %d\ %H:%M:%S\ UTC\ %Y)"
           perl -pi -e "s|UTS_VERSION=\".*\"|UTS_VERSION=\"${UTS_VERSION}\"|" ./common/scripts/mkcompile_h
@@ -654,7 +662,7 @@ jobs:
 
       - name: Set file name
         run: |
-          ARTIFACT_BASE="${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type == 'bypass' && 'Bypass-Build' || matrix.build_type == 'vTomsonek' && 'vTomsonek' || 'Normal-Build' }}-DexSubakti"
+          ARTIFACT_BASE="${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type == 'bypass' && 'Bypass' || matrix.build_type == 'vTomsonek' && 'vTomsonek' || 'Normal' }}"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
