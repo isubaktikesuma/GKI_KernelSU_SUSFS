@@ -333,8 +333,11 @@ jobs:
               ;;
             SukiSU)
               echo "Applying SukiSU specific compilation fixes..."
-              # Fix missing header for SUSFS_MAGIC - Insert at top
-              sed -i '1i #include <linux/susfs.h>' common/drivers/kernelsu/supercalls.c || true
+              # Fix susfs.h missing struct kstat - Patch file directly before supercalls
+              sed -i '1i #include <linux/stat.h>' common/include/linux/susfs.h || true
+
+              # Fix missing header for SUSFS_MAGIC - Insert at top, order matters
+              sed -i '1i #include <linux/stat.h>\n#include <linux/fs.h>\n#include <linux/susfs.h>' common/drivers/kernelsu/supercalls.c || true
               
               # Fix pointer type mismatches (casting void* arg to specific structs)
               sed -i -E 's/susfs_add_sus_path\s*\(\s*arg\s*\)/susfs_add_sus_path((struct st_susfs_sus_path __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
@@ -350,8 +353,8 @@ jobs:
               # We'll pass 0 as a placeholder cmd
               sed -i -E 's/susfs_set_i_state_on_external_dir\s*\(\s*arg\s*\)/susfs_set_i_state_on_external_dir((char __user *)arg, 0)/' common/drivers/kernelsu/supercalls.c || true
               
-              # Fix susfs_get_enabled_features mismatch (too few args) - Replace with 0 to avoid syntax error if used in assignment
-              sed -i -E 's/susfs_get_enabled_features\s*\(\s*arg\s*\)/0/' common/drivers/kernelsu/supercalls.c || true
+              # Fix susfs_get_enabled_features mismatch (too few args) - Cast to void to avoid unused result error
+              sed -i -E 's/susfs_get_enabled_features\s*\(\s*arg\s*\)/(void)0/' common/drivers/kernelsu/supercalls.c || true
               ;;
             KSU)
               # Your KSU-specific code goes here
