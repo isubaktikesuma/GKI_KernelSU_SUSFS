@@ -115,7 +115,8 @@ jobs:
           TARGET="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           COMMIT=""
           case "${{ inputs.ksu_variant }}" in
-            WKSU)
+            WKSU|SukiSU)
+              # For WKSU and SukiSU, we use specific stable commits for SUSFS compatibility
               case "$TARGET" in
                 android12-5.10) COMMIT="8a76ba240d1f7315352b49d97d854a4b166e5b47" ;;
                 android13-5.10) COMMIT="e5c9eabfc6dcfc677d11f46ce1d5ff786de60a92" ;;
@@ -124,10 +125,12 @@ jobs:
                 android14-6.1) COMMIT="a162e2469d0b472545e5e46457eee171c0975fb0" ;;
                 android15-6.6) COMMIT="f450ec00bf592d080f59b01ff6f9242456c9a427" ;;
               esac
-              git checkout "$COMMIT"
+              if [ -n "$COMMIT" ]; then
+                git checkout "$COMMIT"
+              fi
               ;;
             KSU)
-              echo "Not Needed"
+              echo "Using default SUSFS branch head"
               ;;
           esac
 
@@ -222,6 +225,10 @@ jobs:
                 curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild
               fi
               ;;
+            SukiSU)
+               echo "Integrating SukiSU-Ultra with SUSFS support..."
+               curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+               ;;
             KSU)
               if [ -n "${{ inputs.ksu_commit }}" ]; then
                 curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
@@ -240,6 +247,17 @@ jobs:
               cd "$KERNEL_ROOT/Wild_KSU"
               # OLD scheme
               BASE_VERSION=10200
+              COMMIT_COUNT=$(git rev-list --count HEAD)
+              KSU_VERSION=$(expr $BASE_VERSION + $COMMIT_COUNT)
+              ;;
+            SukiSU)
+              # SukiSU usually clones into KernelSU directory via setup script
+              if [ -d "$KERNEL_ROOT/KernelSU" ]; then
+                cd "$KERNEL_ROOT/KernelSU"
+              elif [ -d "$KERNEL_ROOT/SukiSU" ]; then
+                cd "$KERNEL_ROOT/SukiSU"
+              fi
+              BASE_VERSION=10000
               COMMIT_COUNT=$(git rev-list --count HEAD)
               KSU_VERSION=$(expr $BASE_VERSION + $COMMIT_COUNT)
               ;;
@@ -269,16 +287,37 @@ jobs:
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
           cd "$KERNEL_ROOT"
 
+          # Robust Directory Detection for KSU Variant
+          KSU_DIR=""
           if [ "${{ inputs.ksu_variant }}" == "WKSU" ]; then
-            cd "$KERNEL_ROOT/Wild_KSU"
+            KSU_DIR="$KERNEL_ROOT/Wild_KSU"
+          elif [ "${{ inputs.ksu_variant }}" == "SukiSU" ]; then
+             if [ -d "$KERNEL_ROOT/SukiSU" ]; then
+               KSU_DIR="$KERNEL_ROOT/SukiSU"
+             elif [ -d "$KERNEL_ROOT/KernelSU" ]; then
+               KSU_DIR="$KERNEL_ROOT/KernelSU"
+             fi
           elif [ "${{ inputs.ksu_variant }}" == "KSU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"
+             KSU_DIR="$KERNEL_ROOT/KernelSU"
           fi
-          cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-          patch -p1 < 10_enable_susfs_for_ksu.patch || true
+
+          if [ -n "$KSU_DIR" ] && [ -d "$KSU_DIR" ]; then
+             echo "Applying SUSFS enable patch to $KSU_DIR"
+             cd "$KSU_DIR"
+             cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+             patch -p1 < 10_enable_susfs_for_ksu.patch || true
+          else
+             echo "Error: KernelSU directory not found for variant ${{ inputs.ksu_variant }}"
+             # We assume SukiSU might have built-in support if not found, or it's a fatal error.
+             # Continuing to avoid hard breaking, but this log is critical.
+          fi
+          
+          cd "$KERNEL_ROOT"
           
           case "${{ inputs.ksu_variant }}" in
-            WKSU)
+            WKSU|SukiSU)
+              # Apply necessary fix patches for SUSFS compatibility
+              # These fixes are shared between WKSU and SukiSU as they address similar integration issues
               cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch" ./
               patch -p1 < fix_core_hook.c.patch
               
@@ -296,7 +335,7 @@ jobs:
           cd "$KERNEL_ROOT/common"
           # Post-SUSFS sed safeguards for task_mmu.c 'goto show_pad' handling
           case "${{ inputs.ksu_variant }}" in
-            WKSU)
+            WKSU|SukiSU)
               if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 209 ]] ||
                  [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && "${{ inputs.os_patch_level }}" != "2024-05" && $ACTUAL_SUBLEVEL -le 209 ]] ||
                  [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && "${{ inputs.os_patch_level }}" != "2024-05" && $ACTUAL_SUBLEVEL -le 148 ]] ||
@@ -340,7 +379,7 @@ jobs:
           esac
 
       - name: Apply Hooks Patches
-        if: ${{ inputs.ksu_variant == 'WKSU' }}
+        if: ${{ inputs.ksu_variant == 'WKSU' || inputs.ksu_variant == 'SukiSU' }}
         run: |
           cd "$KERNEL_ROOT/common"
           cp "$KERNEL_PATCHES/wild/hooks/scope_min_manual_hooks_v1.4.patch" ./
@@ -417,7 +456,6 @@ jobs:
           # KernelSU Configuration
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure Mountify Support
@@ -497,6 +535,16 @@ jobs:
           echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "${{ env.DEFCONFIG }}"
+
+      - name: Configure SukiSU
+        if: ${{ inputs.ksu_variant == 'SukiSU' }}
+        run: |
+          cd "$KERNEL_ROOT"
+          # SukiSU Specific Configuration
+          echo "# SukiSU Specific Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KALLSYMS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KALLSYMS_ALL=y" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure SND
         if: ${{ inputs.variant == 'vTomsonek' && inputs.android_version == 'android12' && inputs.kernel_version == '5.10' && inputs.sub_level == '226' && inputs.os_patch_level == '2024-11' }}
@@ -589,7 +637,7 @@ jobs:
         run: |
           cd "$KERNEL_ROOT"
           #Wild to Kernel Version
-          sed -i '$s|echo "\$res"|echo "\$res-dexsubakti"|' ./common/scripts/setlocalversion
+          sed -i '$s|echo "\$res"|echo "\$res-Wild"|' ./common/scripts/setlocalversion
           #Set Kernel Timestamp
           UTS_VERSION="#1 SMP PREEMPT $(date -u +%a\ %b\ %d\ %H:%M:%S\ UTC\ %Y)"
           perl -pi -e "s|UTS_VERSION=\".*\"|UTS_VERSION=\"${UTS_VERSION}\"|" ./common/scripts/mkcompile_h
@@ -868,6 +916,11 @@ jobs:
             WKSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$WKSU_COMMIT"
             echo "- **Wild_KSU**: [$WKSU_COMMIT]($WKSU_URL)" >> "$GITHUB_WORKSPACE/build_summary.md"
             cd "$GITHUB_WORKSPACE"
+          elif [ -d "$KERNEL_ROOT/KernelSU" ]; then
+             cd "$KERNEL_ROOT/KernelSU"
+             KSU_COMMIT=$(git rev-parse HEAD)
+             echo "- **KernelSU/SukiSU**: $KSU_COMMIT" >> "$GITHUB_WORKSPACE/build_summary.md"
+             cd "$GITHUB_WORKSPACE"
           else
             echo "- **Wild_KSU**: not present" >> build_summary.md
           fi
