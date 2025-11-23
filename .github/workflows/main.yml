@@ -47,6 +47,7 @@ on:
         options:
           - KSU
           - WKSU
+          - SukiSU
         default: WKSU
       ksu_commit:
         description: "Optional KernelSU commit SHA"
@@ -138,7 +139,7 @@ jobs:
           curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
           chmod +x util_free_space.sh
           ./util_free_space.sh
-      
+       
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -147,7 +148,7 @@ jobs:
         run: |
             LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "")
             NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-    
+       
             echo "New tag: $NEW_TAG"
             echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
@@ -160,7 +161,7 @@ jobs:
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
-      
+       
           **IMPORTANT DISCLAIMER**
           This software is provided for testing and educational purposes only. Use at your own risk.
           The developers are not responsible for any damage, data loss, or issues that may occur.
@@ -204,10 +205,11 @@ jobs:
 
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
-      
+       
           Managers:
           -> WKSU: https://github.com/WildKernels/Wild_KSU
           -> Next: https://github.com/KernelSU-Next/KernelSU-Next
+          -> SukiSU: https://github.com/SukiSU-Ultra/SukiSU-Ultra
           EOF
 
       - name: Create GitHub Release
@@ -255,8 +257,7 @@ jobs:
             -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
             -F text="
-            🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
-            📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
+            🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded* 📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
