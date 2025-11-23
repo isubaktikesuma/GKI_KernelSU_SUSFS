@@ -333,25 +333,25 @@ jobs:
               ;;
             SukiSU)
               echo "Applying SukiSU specific compilation fixes..."
-              # Fix missing header for SUSFS_MAGIC
-              sed -i '/#include <linux\/uaccess.h>/a #include <linux/susfs.h>' common/drivers/kernelsu/supercalls.c || true
+              # Fix missing header for SUSFS_MAGIC - Insert at top
+              sed -i '1i #include <linux/susfs.h>' common/drivers/kernelsu/supercalls.c || true
               
               # Fix pointer type mismatches (casting void* arg to specific structs)
-              sed -i 's/susfs_add_sus_path(arg)/susfs_add_sus_path((struct st_susfs_sus_path __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
-              sed -i 's/susfs_add_sus_kstat(arg)/susfs_add_sus_kstat((struct st_susfs_sus_kstat __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
-              sed -i 's/susfs_update_sus_kstat(arg)/susfs_update_sus_kstat((struct st_susfs_sus_kstat __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
-              sed -i 's/susfs_add_try_umount(arg)/susfs_add_try_umount((struct st_susfs_try_umount __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
-              sed -i 's/susfs_set_uname(arg)/susfs_set_uname((struct st_susfs_uname __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
-              sed -i 's/susfs_set_cmdline_or_bootconfig(arg)/susfs_set_cmdline_or_bootconfig((char __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
-              sed -i 's/susfs_add_open_redirect(arg)/susfs_add_open_redirect((struct st_susfs_open_redirect __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
-              sed -i 's/susfs_add_sus_map(arg)/susfs_add_sus_map((struct st_susfs_sus_map __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_add_sus_path\s*\(\s*arg\s*\)/susfs_add_sus_path((struct st_susfs_sus_path __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_add_sus_kstat\s*\(\s*arg\s*\)/susfs_add_sus_kstat((struct st_susfs_sus_kstat __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_update_sus_kstat\s*\(\s*arg\s*\)/susfs_update_sus_kstat((struct st_susfs_sus_kstat __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_add_try_umount\s*\(\s*arg\s*\)/susfs_add_try_umount((struct st_susfs_try_umount __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_set_uname\s*\(\s*arg\s*\)/susfs_set_uname((struct st_susfs_uname __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_set_cmdline_or_bootconfig\s*\(\s*arg\s*\)/susfs_set_cmdline_or_bootconfig((char __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_add_open_redirect\s*\(\s*arg\s*\)/susfs_add_open_redirect((struct st_susfs_open_redirect __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_add_sus_map\s*\(\s*arg\s*\)/susfs_add_sus_map((struct st_susfs_sus_map __user *)arg)/' common/drivers/kernelsu/supercalls.c || true
               
               # Fix argument count mismatch (cmd argument missing in SukiSU call)
               # We'll pass 0 as a placeholder cmd
-              sed -i 's/susfs_set_i_state_on_external_dir(arg)/susfs_set_i_state_on_external_dir((char __user *)arg, 0)/' common/drivers/kernelsu/supercalls.c || true
+              sed -i -E 's/susfs_set_i_state_on_external_dir\s*\(\s*arg\s*\)/susfs_set_i_state_on_external_dir((char __user *)arg, 0)/' common/drivers/kernelsu/supercalls.c || true
               
-              # Fix susfs_get_enabled_features mismatch (too few args) - Comment out to avoid build fail
-              sed -i 's/susfs_get_enabled_features(arg)/\/\/ susfs_get_enabled_features(arg)/' common/drivers/kernelsu/supercalls.c || true
+              # Fix susfs_get_enabled_features mismatch (too few args) - Replace with 0 to avoid syntax error if used in assignment
+              sed -i -E 's/susfs_get_enabled_features\s*\(\s*arg\s*\)/0/' common/drivers/kernelsu/supercalls.c || true
               ;;
             KSU)
               # Your KSU-specific code goes here
