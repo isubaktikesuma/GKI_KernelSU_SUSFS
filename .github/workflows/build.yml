@@ -589,7 +589,7 @@ jobs:
         run: |
           cd "$KERNEL_ROOT"
           #Wild to Kernel Version
-          sed -i '$s|echo "\$res"|echo "\$res-Wild"|' ./common/scripts/setlocalversion
+          sed -i '$s|echo "\$res"|echo "\$res-dexsubakti"|' ./common/scripts/setlocalversion
           #Set Kernel Timestamp
           UTS_VERSION="#1 SMP PREEMPT $(date -u +%a\ %b\ %d\ %H:%M:%S\ UTC\ %Y)"
           perl -pi -e "s|UTS_VERSION=\".*\"|UTS_VERSION=\"${UTS_VERSION}\"|" ./common/scripts/mkcompile_h
