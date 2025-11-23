@@ -417,6 +417,7 @@ jobs:
           # KernelSU Configuration
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure Mountify Support
